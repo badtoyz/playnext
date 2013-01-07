@@ -43,9 +43,13 @@ function read_progress_file() {
   print_verbose "Reading progress file ${progress_file}..."
   while read; do
     if [[ $REPLY == $media_dir* ]]; then
-      previous_episode="$REPLY"
-      print_verbose "Previous episode: ${previous_episode#$media_dir/}"
-      break
+      if [[ -z $previous_episode ]]; then
+        previous_episode="$REPLY"
+        print_verbose "Previous episode: ${previous_episode#$media_dir/}"
+      else
+        print_error "Multiple previous episodes remembered for $media_dir: at least $previous_episode and $REPLY. Use -e to specify episode"
+        return 1
+      fi
     fi
   done < "$progress_file"
   echo "$previous_episode"
@@ -92,11 +96,11 @@ function find_next_episode() {
   done < <(find "$media_dir" -type f | sort -f -d)
   if (( use_next )); then
     print_error "No more episodes after ${previous_episode#$media_dir/}"
-    return
+    return 1
   fi
   if [[ -z $first_episode ]]; then
     print_error "No episodes found in ${media_dir}"
-    return
+    return 1
   fi
   if [[ -z $current_episode ]]; then
     if [[ -z $previous_episode ]]; then
@@ -104,6 +108,7 @@ function find_next_episode() {
       echo "$first_episode"
     else
       print_error "Previous episode ${previous_episode#$media_dir/} not found; use -e to specify episode"
+      return 1
     fi
   else
     echo "$current_episode"
@@ -170,12 +175,13 @@ if [[ ! -z $current_episode ]]; then
   fi
 else
   previous_episode="$(read_progress_file)"
-  if [[ -z $previous_episode ]]; then
+  if (( $? )); then
     print_verbose "No matching previous episode found in config"
+    exit 1
   fi
 
   current_episode="$(find_next_episode "$previous_episode")" 
-  if [[ -z $current_episode ]]; then
+  if (( $? )); then
     exit 1
   fi
 fi
