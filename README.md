@@ -4,7 +4,7 @@
 
 The basic operation is as follows: `cd` to a directory that contains some media files, and type:
 
-    mplayer `playnext`
+    mplayer "`playnext`"
 
 Instead of `mplayer`, you can of course use any media player or other tool of your choice. The `playnext` script will have remembered the filename of the last episode you played (if any), and output the next one. The backticks make the shell substitute this filename in that place.
 
