@@ -57,7 +57,7 @@ function read_progress_file() {
 
 function write_progress_file() {
   local current_episode="$1"
-  local progress_file_tmp="$(tempfile -d $(dirname "$progress_file"))"
+  local progress_file_tmp="$(mktemp --tmpdir="$(dirname "$progress_file")" playnextrc.XXXXX)"
   print_verbose "Writing new progress file to $progress_file_tmp..."
   while read; do
     if [[ $REPLY == $media_dir* ]]; then
@@ -93,7 +93,7 @@ function find_next_episode() {
         use_next=1
       fi
     fi
-  done < <(find "$media_dir" -type f | sort -f -d)
+  done < <(find "$media_dir" -type f ! -path "*/.*" | sort -f -d)
   if (( use_next )); then
     print_error "No more episodes after ${previous_episode#$media_dir/}"
     return 1
@@ -115,20 +115,20 @@ function find_next_episode() {
   fi
 }
 
-while getopts ":e:hf:lnpv" opt; do
+while getopts ":d:e:hf:lnpv" opt; do
   case $opt in
     d)
       media_dir="$OPTARG"
-      ;;
-    h)
-      print_usage
-      exit 0
       ;;
     e)
       current_episode="$OPTARG"
       ;;
     f)
       progress_file="$OPTARG"
+      ;;
+    h)
+      print_usage
+      exit 0
       ;;
     l)
       list=1
