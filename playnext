@@ -19,14 +19,14 @@ function print_usage() {
   echo "  mplayer \`$script_name\`"
   echo
   echo "Options:"
-  echo "  -d directory  print files from given directory (default: current directory)"
-  echo "  -e filename   output given episode and remember this"
-  echo "  -f filename   configuration file name (default: $progress_file)"
-  echo "  -h            show this help"
-  echo "  -l            print the list of last episodes played"
-  echo "  -n            don't advance; next run will print same output"
-  echo "  -p            print previously outputted episode"
-  echo "  -v            verbose mode; useful for debugging"
+  echo "  -d, --dir=directory           print files from given directory (default: .)"
+  echo "  -e, --episode=filename        output given episode and remember this"
+  echo "  -f, --progress-file=filename  configuration file name (default: $progress_file)"
+  echo "  -h, --help                    show this help"
+  echo "  -l, --list                    print the list of last episodes played"
+  echo "  -n, --no-advance              don't advance; next run will print same output"
+  echo "  -p, --previous                print previously outputted episode"
+  echo "  -v, --verbose                 verbose mode; useful for debugging"
 }
 
 function print_verbose() {
@@ -115,43 +115,54 @@ function find_next_episode() {
   fi
 }
 
-while getopts ":d:e:hf:lnpv" opt; do
-  case $opt in
-    d)
-      media_dir="$OPTARG"
+function usage_error() {
+  print_usage
+  print_error "$1"
+  exit 1
+}
+
+function require_argument() {
+  [[ -z ${2+x} ]] && print_usage && print_error "Option $1 requires an argument" && exit 1
+}
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -d | --directory)
+      require_argument "$@"
+      media_dir="$2"
+      shift
       ;;
-    e)
-      current_episode="$OPTARG"
+    -e | --episode)
+      require_argument "$@"
+      current_episode="$2"
+      shift
       ;;
-    f)
-      progress_file="$OPTARG"
+    -f | --progress-file)
+      require_argument "$@"
+      progress_file="$2"
+      shift
       ;;
-    h)
+    -h | --help)
       print_usage
       exit 0
       ;;
-    l)
+    -l | --list)
       list=1
       ;;
-    n)
+    -n | --no-advance)
       advance=0
       ;;
-    p)
+    -p | --previous)
       previous=1
       ;;
-    v)
+    -v | --verbose)
       verbose=1
       ;;
-    \?)
-      print_usage
-      print_error "Invalid option: -$OPTARG"
-      exit 1
-      ;;
-    :)
-      print_usage
-      print_error "Option -$OPTARG requires an argument"
+    -*)
+      usage_error "Invalid option: $opt"
       ;;
   esac
+  shift
 done
 
 media_dir="$(readlink -f "$media_dir")"
