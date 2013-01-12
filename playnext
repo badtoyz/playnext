@@ -1,36 +1,29 @@
 #!/bin/bash
 
-script_name=$(basename $0)
-progress_file=$HOME/.playnextrc
-previous=0
-advance=1
-list=0
-media_dir=.
-verbose=0
-current_episode=
+SCRIPT_NAME=$(basename $0)
 if [[ -t 1 ]]; then
-  command=mplayer
+  DEFAULT_COMMAND=mplayer
 else
-  command=echo
+  DEFAULT_COMMAND=echo
 fi
 
 function print_usage() {
   #     12345678901234567890123456789012345678901234567890123456789012345678901234567890
-  echo "Usage:  $script_name [OPTION]... [DIR]"
+  echo "Usage:  $SCRIPT_NAME [OPTION]... [DIR]"
   echo
-  echo "Plays the next episode in the given directory."
+  echo "Plays the next episode in the given directory. If no directory is given, uses"
+  echo "the current directory."
   echo
   echo "If not connected to a terminal, prints the filename instead of playing it."
   echo "This allows you to do things like:"
   echo
-  echo "  cp "`playnext`" /mnt/ipod"
+  echo "  cp "\`playnext\`" /mnt/ipod"
   echo
   echo "Options:"
   echo "  -c, --command=command         command to use to play file echo (default: "
   echo "                                  mplayer if connected to a tty, echo otherwise)"
   echo "  -e, --episode=filename        output given episode and remember this"
-  echo "  -f, --progress-file=filename  configuration file name (default: "
-  echo "                                  $progress_file)"
+  echo "  -f, --progress-file=filename  configuration file name (default: ~/.playnextrc)"
   echo "  -h, --help                    show this help"
   echo "  -l, --list                    print the list of last episodes played"
   echo "  -n, --no-advance              don't advance; next run will print same output"
@@ -40,12 +33,12 @@ function print_usage() {
 
 function print_verbose() {
   if (( verbose )); then
-    echo "$script_name: $@" >&2
+    echo "$SCRIPT_NAME: $@" >&2
   fi
 }
 
 function print_error() {
-  echo "$script_name: $@" >&2
+  echo "$SCRIPT_NAME: $@" >&2
 }
 
 function exit_error() {
@@ -55,7 +48,7 @@ function exit_error() {
 
 function read_progress_file() {
   print_verbose "Reading progress file ${progress_file}..."
-  IFS=$(echo -e '\n') progress=( $(< "$progress_file") )
+  IFS=$'\n' progress=( $(< "$progress_file") )
 }
 
 function find_previous_episode() {
@@ -64,7 +57,6 @@ function find_previous_episode() {
       if [[ -z $previous_episode ]]; then
         previous_episode="$episode"
         print_verbose "Previous episode: $previous_episode"
-        return
       else
         exit_error "Multiple previous episodes remembered for $media_dir: at least $previous_episode and $REPLY. Use -e to specify episode"
       fi
@@ -88,41 +80,31 @@ function write_progress_file() {
 }
 
 function find_next_episode() {
-  local use_next=0
-  local first=1
-  while read; do
-    if (( first )); then
-      first=0
-      first_episode="$REPLY"
-    fi
-    if (( use_next )); then
-      use_next=0
-      current_episode="$REPLY"
-      break
-    fi
-    if [[ $REPLY == $previous_episode ]]; then
-      if (( previous )); then
-        current_episode="$REPLY"
-        return
-      else
-        use_next=1
+  IFS=$'\n' episodes=( $(find "$media_dir" -type f ! -path "*/.*" | sort -f -d) )
+  num_episodes=${#episodes[@]}
+  print_verbose "Found $num_episodes episodes in $media_dir"
+
+  if (( $num_episodes == 0 )); then
+    exit_error "No episodes found in $media_dir"
+  fi
+
+  if [[ -z $previous_episode ]]; then
+    print_verbose "No previous episode found; starting from first"
+    current_episode="${episodes[0]}"
+    return
+  fi
+
+  for (( i = 0; i < ${#episodes[@]}; i++ )); do
+    if [[ ${episodes[$i]} == $previous_episode ]]; then
+      if (( i + 1 >= $num_episodes )); then
+        exit_error "No more episodes after ${previous_episode#$media_dir/}"
       fi
+      current_episode="${episodes[$(( i + 1 ))]}"
+      return
     fi
-  done < <(find "$media_dir" -type f ! -path "*/.*" | sort -f -d)
-  if (( use_next )); then
-    exit_error "No more episodes after ${previous_episode#$media_dir/}"
-  fi
-  if [[ -z $first_episode ]]; then
-    exit_error "No episodes found in ${media_dir}"
-  fi
-  if [[ -z $current_episode ]]; then
-    if [[ -z $previous_episode ]]; then
-      print_verbose "No previous episode found; starting from first"
-      current_episode="$first_episode"
-    else
-      exit_error "Previous episode ${previous_episode#$media_dir/} not found; use -e to specify episode"
-    fi
-  fi
+  done
+
+  exit_error "Previous episode ${previous_episode#$media_dir/} not found; use -e to specify episode"
 }
 
 function usage_error() {
@@ -135,7 +117,7 @@ function require_argument() {
   [[ -z ${2+x} ]] && print_usage && print_error "Option $1 requires an argument" && exit 1
 }
 
-while [[ $# -gt 0 ]]; do
+while (( $# > 0 )); do
   case $1 in
     -c | --command)
       require_argument "$@"
@@ -165,7 +147,7 @@ while [[ $# -gt 0 ]]; do
       list=1
       ;;
     -n | --no-advance)
-      advance=0
+      no_advance=1
       ;;
     -p | --previous)
       previous=1
@@ -174,16 +156,19 @@ while [[ $# -gt 0 ]]; do
       verbose=1
       ;;
     -*)
-      usage_error "Invalid option: $opt"
+      usage_error "Invalid option: $1"
       ;;
     *)
-      (( set_media_dir )) && usage_error "Multiple directories given"
+      [[ ! -z $media_dir ]] && usage_error "Multiple directories given"
       media_dir="$1"
-      set_media_dir=1
       ;;
   esac
   shift
 done
+
+progress_file=${progress_file-$HOME/.playnextrc}
+media_dir=${media_dir-.}
+command=${command-$DEFAULT_COMMAND}
 
 touch "$progress_file"
 read_progress_file
@@ -206,11 +191,13 @@ if [[ ! -z $current_episode ]]; then
   print_verbose "Using current episode $current_episode"
 else
   find_previous_episode
-  find_next_episode
+  if (( previous )); then
+    current_episode="$previous_episode"
+  else
+    find_next_episode
+  fi
 fi
 
-$command "${current_episode}"
-
-if (( advance )); then
-  write_progress_file "$current_episode"
+if $command "${current_episode}"; then
+  (( no_advance )) || write_progress_file "$current_episode"
 fi
