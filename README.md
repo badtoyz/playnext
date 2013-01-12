@@ -2,11 +2,19 @@
 
 `playnext` is a small shell script that helps you watch series, listen to podcasts, or basically do anything to a series of files sequentially.
 
-The basic operation is as follows: `cd` to a directory that contains some media files, and type:
+The basic operation is as follows: if `/some/directory` contains media files, type
 
-    mplayer "`playnext`"
+    playnext /some/directory
 
-Instead of `mplayer`, you can of course use any media player or other tool of your choice. The `playnext` script will have remembered the filename of the last episode you played (if any), and output the next one. The backticks make the shell substitute this filename in that place.
+and it will play the first media file in the directory and its subdirectories, using `mplayer`. The next time you run it, it plays the second one, and so on.
+
+After you've once typed `/some/directory` in full, you can afterwards get by with just a substring of the final directory component, e.g. `directory`, `dir` or even `d`:
+
+    playnext dir
+
+As long as this uniquely identifies a previously used directory, it will work.
+
+Instead of `mplayer`, you can of course use any media player or other tool of your choice, using the `-c` option.
 
 Caveats:
 
