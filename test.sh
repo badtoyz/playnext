@@ -3,8 +3,7 @@
 playnext=$(dirname $(readlink -f $0))/playnext
 
 function fail() {
-  echo "FAIL: $@"
-  echo "Last command: $last_command"
+  echo "$@"
   echo "Backtrace:"
   i=0
   while caller $(( i++ )); do true; done
@@ -12,9 +11,19 @@ function fail() {
 }
 
 function playnext() {
-  args="-f $progress_file"
-  last_command="$playnext $args $@"
-  $playnext $args "$@"
+  (
+    echo "Running command:"
+    echo -n "$playnext -f $progress_file -v"
+    for arg in "$@"; do
+      if [[ $arg =~ "^[a-zA-Z0-9]*$" ]]; then
+        echo -n " $arg"
+      else
+        echo -n " '$arg'"
+      fi
+    done
+    echo
+  ) >&2
+  $playnext -f $progress_file "$@"
 }
 
 function assert_output() {
@@ -23,11 +32,9 @@ function assert_output() {
   local actual="$(playnext "$@")"
   if (( $? )); then
     fail "Nonzero exit code"
-    exit 1
   fi
   if [[ $expected != $actual ]]; then
-    fail "Expected: $expected, actual: $actual"
-    exit 1
+    fail "Expected: $expected"$'\n'"Actual: $actual"
   fi
 }
 
@@ -38,36 +45,18 @@ function assert_fail() {
 }
 
 function set_up_fixture() {
-  media_dir_1=$(mktemp -d)
-  cd $media_dir_1
-  mkdir "Dir 1"
-  touch "Dir 1/File 1"
-  touch "Dir 1/file 2"
-  touch "Dir 1/File 3"
-  mkdir "Dir 2"
-  mkdir "Dir 3"
-  touch "Dir 3/File 1"
-  touch ".dotfile"
-  mkdir ".dotdir"
-  touch ".dotdir/file"
-
-  media_dir_2=$(mktemp -d)
-  cd $media_dir_2
-  mkdir "Dir 4"
-  touch "Dir 4/File 1"
-  touch "File 2"
-
-  media_dir_3=$(mktemp -d)
-
-  progress_file=$(mktemp)
+  cd "$(dirname $0)/testdata"
+  media_dir_1=$(readlink -f t1)
+  media_dir_2=$(readlink -f t2)
+  media_dir_3=$(readlink -f t3)
 }
 
 function tear_down_fixture() {
-  rm -r "$media_dir_1" "$media_dir_2" "$media_dir_3"
+  true
 }
 
 function set_up() {
-  cd ${TMPDIR-/tmp}
+  progress_file=$(mktemp)
 }
 
 function tear_down() {
@@ -75,44 +64,52 @@ function tear_down() {
 }
 
 function test_with_empty_dir() {
-  cd $media_dir_3
-  assert_fail "Did not fail with empty dir"
+  assert_fail "Did not fail with empty dir" $media_dir_3
 }
 
 function test_with_some_files() {
-  cd $media_dir_1
-  assert_output "$media_dir_1/Dir 1/File 1"
-  assert_output "$media_dir_1/Dir 1/file 2"
-  assert_output "$media_dir_1/Dir 1/File 3"
-  assert_output "$media_dir_1/Dir 3/File 1"
+  assert_output "$media_dir_1/Dir 1/File 1" $media_dir_1
+  assert_output "$media_dir_1/Dir 1/file 2" $media_dir_1
+  assert_output "$media_dir_1/Dir 1/File 3" $media_dir_1
+  assert_output "$media_dir_1/Dir 3/File 1" $media_dir_1
   assert_fail "Did not run out of files"
 }
 
 function test_multiple_episodes_in_progress() {
-  cd $media_dir_1
-  playnext "Dir 1" -e "Dir 1/File 1" > /dev/null
-  playnext "Dir 3" -e "Dir 3/File 1" > /dev/null
+  playnext "$media_dir_1/Dir 1" -e "Dir 1/File 1" > /dev/null
+  playnext "$media_dir_1/Dir 3" -e "Dir 3/File 1" > /dev/null
   assert_fail "Did not warn about multiple episodes in progress"
 }
 
 function test_multiple_media_dirs() {
-  cd $media_dir_1
-  playnext > /dev/null
-  cd $media_dir_2
-  playnext > /dev/null
+  playnext $media_dir_1 > /dev/null
+  playnext $media_dir_2 > /dev/null
   assert_output "$(echo -e "$media_dir_1/Dir 1/File 1\n$media_dir_2/Dir 4/File 1")" -l
 }
 
 function test_directory_argument() {
   assert_output "$media_dir_1/Dir 1/File 1" $media_dir_1
+  assert_fail "Did not fail without directory argument"
   assert_fail "Did not fail with multiple directories" $media_dir_1 $media_dir_2
 }
 
-function test_episode_option() {
+function test_directory_substring() {
+  playnext $media_dir_1 > /dev/null
+  playnext $media_dir_2 > /dev/null
+  assert_output "$media_dir_1/Dir 1/file 2" "r 1"
+  assert_fail "Did not complain about multiple substring matches" 1
+}
+
+function test_filename_argument() {
   cd $media_dir_1
-  assert_output "$media_dir_1/Dir 1/file 2" -e "Dir 1/file 2"
-  assert_output "$media_dir_1/Dir 1/File 3"
-  assert_fail "Invalid file for -e was accepted" -e /dev/null
+  assert_output "$media_dir_1/Dir 1/file 2" "Dir 1/file 2"
+  assert_output "$media_dir_1/Dir 1/File 3" $media_dir_1
+}
+
+function test_episode_option() {
+  assert_output "$media_dir_1/Dir 1/file 2" $media_dir_1 -e "Dir 1/file 2"
+  assert_output "$media_dir_1/Dir 1/File 3" $media_dir_1
+  assert_fail "Invalid file for -e was accepted" $media_dir_1 -e /dev/null
 }
 
 function test_help_option() {
@@ -127,31 +124,38 @@ function test_list_option() {
 }
 
 function test_next_option() {
-  cd $media_dir_1
-  assert_output "$media_dir_1/Dir 1/file 2" -n
-  assert_output "$media_dir_1/Dir 3/File 1" -n
+  assert_output "$media_dir_1/Dir 1/file 2" $media_dir_1 -n
+  assert_output "$media_dir_1/Dir 3/File 1" $media_dir_1 -n
 }
 
 function test_previous_option() {
-  cd $media_dir_1
-  playnext > /dev/null
-  assert_output "$media_dir_1/Dir 1/File 1" -p
-  assert_output "$media_dir_1/Dir 1/file 2"
-  assert_output "$media_dir_1/Dir 1/File 1" -p -p
+  playnext $media_dir_1 > /dev/null
+  assert_output "$media_dir_1/Dir 1/File 1" $media_dir_1 -p
+  assert_output "$media_dir_1/Dir 1/file 2" $media_dir_1
+  assert_output "$media_dir_1/Dir 1/File 1" $media_dir_1 -p -p
 }
 
 function test_command_option() {
-  cd $media_dir_1
-  assert_output "" -c cat
-  assert_output "$media_dir_1/Dir 1/file 2" -c echo
+  assert_output "" $media_dir_1 -c cat
+  assert_output "$media_dir_1/Dir 1/file 2" $media_dir_1 -c echo
 }
 
+pass_count=0
+fail_count=0
 set_up_fixture
 trap tear_down_fixture EXIT
 while read function; do
   [[ ! $function = test* ]] && continue
   set_up
-  $function
+  output=$($function 2>&1)
+  if (( $? )); then
+    echo "FAIL: $function"
+    echo "$output"
+    (( fail_count++ ))
+  else
+    echo "PASS: $function"
+    (( pass_count++ ))
+  fi
   tear_down
-  echo "PASS: $function"
 done < <(declare -F | cut -d' ' -f3)
+echo "$pass_count passes, $fail_count failures"

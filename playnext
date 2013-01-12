@@ -6,24 +6,33 @@ if [[ -t 1 ]]; then
 else
   DEFAULT_COMMAND=echo
 fi
+DEFAULT_PROGRESS_FILE=.playnextrc
 
 function print_usage() {
   #     12345678901234567890123456789012345678901234567890123456789012345678901234567890
-  echo "Usage:  $SCRIPT_NAME [OPTION]... [DIR]"
+  echo "Usage:  $SCRIPT_NAME [OPTION]... DIR"
   echo
-  echo "Plays the next episode in the given directory. If no directory is given, uses"
-  echo "the current directory."
+  echo "Plays the next episode in the given directory."
+  echo
+  echo "If you previously played something from a particular directory, you can"
+  echo "supply any unique substring of that directory as the DIR argument, e.g.:"
+  echo
+  echo "  $SCRIPT_NAME \"$HOME/My Wonderful Podcast\""
+  echo "  $SCRIPT_NAME Wonder"
   echo
   echo "If not connected to a terminal, prints the filename instead of playing it."
   echo "This allows you to do things like:"
   echo
-  echo "  cp "\`playnext\`" /mnt/ipod"
+  echo "  cp \"\`$SCRIPT_NAME\`\" /mnt/ipod"
+  echo
+  echo "History is tracked in the 'progress file' which is a plain text file listing one"
+  echo "absolute path name per line for each previously played episode."
   echo
   echo "Options:"
-  echo "  -c, --command=command         command to use to play file echo (default: "
-  echo "                                  mplayer if connected to a tty, echo otherwise)"
-  echo "  -e, --episode=filename        output given episode and remember this"
-  echo "  -f, --progress-file=filename  configuration file name (default: ~/.playnextrc)"
+  echo "  -c, --command=command         command to use to play file (default: mplayer"
+  echo "                                    if connected to a tty, echo otherwise)"
+  echo "  -e, --episode=filename        play given episode and remember this"
+  echo "  -f, --progress-file=filename  progress file name (default: ~/$DEFAULT_PROGRESS_FILE)"
   echo "  -h, --help                    show this help"
   echo "  -l, --list                    print the list of last episodes played"
   echo "  -n, --next                    skip episode (can be repeated)"
@@ -49,6 +58,31 @@ function exit_error() {
 function read_progress_file() {
   print_verbose "Reading progress file ${progress_file}..."
   IFS=$'\n' progress=( $(< "$progress_file") )
+}
+
+function find_media_dir() {
+  local matches=( )
+  for episode in "${progress[@]}"; do
+    if [[ $episode == *$media_dir* ]]; then
+      matches+=( $episode )
+    fi
+  done
+
+  if (( ${#matches[@]} == 0 )); then
+    exit_error "$media_dir is neither an existing directory nor a substring of a previously used directory"
+  fi
+  if (( ${#matches[@]} > 1 )); then
+    local message="'$media_dir' is not unique; did you mean any of the following?"
+    for match in "${matches[@]}"; do message="$message"$'\n'"    $match"; done
+    exit_error "$message"
+  fi
+
+  local new_media_dir="${matches[0]}"
+  while [[ ${new_media_dir%/*} == *$media_dir* ]]; do
+    new_media_dir="${new_media_dir%/*}"
+  done
+
+  media_dir="$new_media_dir"
 }
 
 function find_previous_episode() {
@@ -176,8 +210,7 @@ while (( $# > 0 )); do
   shift
 done
 
-progress_file=${progress_file-$HOME/.playnextrc}
-media_dir=${media_dir-.}
+progress_file=${progress_file-$HOME/$DEFAULT_PROGRESS_FILE}
 command=${command-$DEFAULT_COMMAND}
 offset=$(( offset + 1 ))
 
@@ -191,10 +224,24 @@ if (( list )); then
   exit 0
 fi
 
+[[ -z $media_dir ]] && usage_error "No directory given"
+
+if [[ -d $media_dir ]]; then
+  print_verbose "Media directory found"
+elif [[ -f $media_dir ]]; then
+  print_verbose "Media directory $media_dir is a file; treating as current episode"
+  current_episode="$(readlink -f "$media_dir")"
+  media_dir="$(dirname "$current_episode")"
+else
+  print_verbose "Media directory does not exist; trying substring match"
+  find_media_dir
+fi
 media_dir="$(readlink -f "$media_dir")"
 print_verbose "Using directory $media_dir"
+cd "$media_dir"
 
 current_episode="$(readlink -f "$current_episode")"
+print_verbose "Canonical current episode is $current_episode"
 if [[ ! -z $current_episode ]]; then
   if [[ $current_episode != $media_dir* ]]; then
     exit_error "The given file $current_episode does not reside in $media_dir"
