@@ -48,40 +48,46 @@ function print_error() {
   echo "$script_name: $@" >&2
 }
 
+function exit_error() {
+  print_error "$@"
+  exit 1
+}
+
 function read_progress_file() {
   print_verbose "Reading progress file ${progress_file}..."
-  while read; do
-    if [[ $REPLY == $media_dir* ]]; then
+  IFS=$(echo -e '\n') progress=( $(< "$progress_file") )
+}
+
+function find_previous_episode() {
+  for episode in "${progress[@]}"; do
+    if [[ $episode == $media_dir* ]]; then
       if [[ -z $previous_episode ]]; then
-        previous_episode="$REPLY"
-        print_verbose "Previous episode: ${previous_episode#$media_dir/}"
+        previous_episode="$episode"
+        print_verbose "Previous episode: $previous_episode"
+        return
       else
-        print_error "Multiple previous episodes remembered for $media_dir: at least $previous_episode and $REPLY. Use -e to specify episode"
-        return 1
+        exit_error "Multiple previous episodes remembered for $media_dir: at least $previous_episode and $REPLY. Use -e to specify episode"
       fi
     fi
-  done < "$progress_file"
-  echo "$previous_episode"
+  done
 }
 
 function write_progress_file() {
   local current_episode="$1"
-  local progress_file_tmp="$(mktemp --tmpdir="$(dirname "$progress_file")" playnextrc.XXXXX)"
-  print_verbose "Writing new progress file to $progress_file_tmp..."
-  while read; do
-    if [[ $REPLY != $media_dir* ]]; then
-      echo "$REPLY"
+  print_verbose "Writing new progress file to $progress_file..."
+  (
+    for episode in "${progress[@]}"; do
+      if [[ $episode != $media_dir* ]]; then
+        echo "$episode"
+      fi
+    done 
+    if [[ ! -z $current_episode ]]; then
+      echo "$current_episode"
     fi
-  done < "$progress_file" > "$progress_file_tmp"
-  if [[ ! -z $current_episode ]]; then
-    echo "$current_episode" >> "$progress_file_tmp"
-  fi
-  print_verbose "Moving $progress_file_tmp into place..."
-  mv "$progress_file_tmp" "$progress_file"
+  ) > "$progress_file"
 }
 
 function find_next_episode() {
-  local previous_episode="$1"
   local use_next=0
   local first=1
   while read; do
@@ -97,30 +103,25 @@ function find_next_episode() {
     if [[ $REPLY == $previous_episode ]]; then
       if (( previous )); then
         current_episode="$REPLY"
-        break
+        return
       else
         use_next=1
       fi
     fi
   done < <(find "$media_dir" -type f ! -path "*/.*" | sort -f -d)
   if (( use_next )); then
-    print_error "No more episodes after ${previous_episode#$media_dir/}"
-    return 1
+    exit_error "No more episodes after ${previous_episode#$media_dir/}"
   fi
   if [[ -z $first_episode ]]; then
-    print_error "No episodes found in ${media_dir}"
-    return 1
+    exit_error "No episodes found in ${media_dir}"
   fi
   if [[ -z $current_episode ]]; then
     if [[ -z $previous_episode ]]; then
       print_verbose "No previous episode found; starting from first"
-      echo "$first_episode"
+      current_episode="$first_episode"
     else
-      print_error "Previous episode ${previous_episode#$media_dir/} not found; use -e to specify episode"
-      return 1
+      exit_error "Previous episode ${previous_episode#$media_dir/} not found; use -e to specify episode"
     fi
-  else
-    echo "$current_episode"
   fi
 }
 
@@ -185,35 +186,27 @@ while [[ $# -gt 0 ]]; do
 done
 
 touch "$progress_file"
+read_progress_file
 
 if (( list )); then
-  cat "$progress_file"
+  for episode in "${progress[@]}"; do
+    echo "$episode"
+  done
   exit 0
 fi
 
 media_dir="$(readlink -f "$media_dir")"
 print_verbose "Using directory $media_dir"
+
 current_episode="$(readlink -f "$current_episode")"
-print_verbose "Using manually specified episode $current_episode"
-
 if [[ ! -z $current_episode ]]; then
-  if [[ $current_episode == $media_dir* ]]; then
-    print_verbose "Using current episode ${current_episode#$media_dir/}"
-  else
-    print_error "The given file $current_episode does not reside in $media_dir"
-    exit 1
+  if [[ $current_episode != $media_dir* ]]; then
+    exit_error "The given file $current_episode does not reside in $media_dir"
   fi
+  print_verbose "Using current episode $current_episode"
 else
-  previous_episode="$(read_progress_file)"
-  if (( $? )); then
-    print_verbose "No matching previous episode found in config"
-    exit 1
-  fi
-
-  current_episode="$(find_next_episode "$previous_episode")" 
-  if (( $? )); then
-    exit 1
-  fi
+  find_previous_episode
+  find_next_episode
 fi
 
 $command "${current_episode}"
