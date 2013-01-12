@@ -126,18 +126,18 @@ function test_list_option() {
   assert_output "$file" -l
 }
 
-function test_no_advance_option() {
+function test_next_option() {
   cd $media_dir_1
-  assert_output "$media_dir_1/Dir 1/File 1"
   assert_output "$media_dir_1/Dir 1/file 2" -n
-  assert_output "$media_dir_1/Dir 1/file 2" -n
+  assert_output "$media_dir_1/Dir 3/File 1" -n
 }
 
 function test_previous_option() {
   cd $media_dir_1
-  assert_output "$media_dir_1/Dir 1/File 1"
+  playnext > /dev/null
   assert_output "$media_dir_1/Dir 1/File 1" -p
-  assert_output "$media_dir_1/Dir 1/File 1" -p
+  assert_output "$media_dir_1/Dir 1/file 2"
+  assert_output "$media_dir_1/Dir 1/File 1" -p -p
 }
 
 function test_command_option() {
