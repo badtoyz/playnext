@@ -140,6 +140,12 @@ function test_previous_option() {
   assert_output "$media_dir_1/Dir 1/File 1" -p
 }
 
+function test_command_option() {
+  cd $media_dir_1
+  assert_output "" -c cat
+  assert_output "$media_dir_1/Dir 1/file 2" -c echo
+}
+
 set_up_fixture
 trap tear_down_fixture EXIT
 while read function; do

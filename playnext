@@ -8,21 +8,29 @@ list=0
 media_dir=.
 verbose=0
 current_episode=
+if [[ -t 1 ]]; then
+  command=mplayer
+else
+  command=echo
+fi
 
 function print_usage() {
+  #     12345678901234567890123456789012345678901234567890123456789012345678901234567890
   echo "Usage:  $script_name [OPTION]... [DIR]"
   echo
-  echo "Outputs the file name of the next episode in the current directory, recursively."
-  echo "Typically, you'd want to run this as:"
+  echo "Plays the next episode in the given directory."
   echo
-  echo "  cd /some/directory/with/media/files"
-  echo "  mplayer \`$script_name\`"
+  echo "If not connected to a terminal, prints the filename instead of playing it."
+  echo "This allows you to do things like:"
   echo
-  echo "When DIR is given, use that directory instead of the current one."
+  echo "  cp "`playnext`" /mnt/ipod"
   echo
   echo "Options:"
+  echo "  -c, --command=command         command to use to play file echo (default: "
+  echo "                                  mplayer if connected to a tty, echo otherwise)"
   echo "  -e, --episode=filename        output given episode and remember this"
-  echo "  -f, --progress-file=filename  configuration file name (default: $progress_file)"
+  echo "  -f, --progress-file=filename  configuration file name (default: "
+  echo "                                  $progress_file)"
   echo "  -h, --help                    show this help"
   echo "  -l, --list                    print the list of last episodes played"
   echo "  -n, --no-advance              don't advance; next run will print same output"
@@ -128,6 +136,11 @@ function require_argument() {
 
 while [[ $# -gt 0 ]]; do
   case $1 in
+    -c | --command)
+      require_argument "$@"
+      command="$2"
+      shift
+      ;;
     -d | --directory)
       require_argument "$@"
       media_dir="$2"
@@ -171,17 +184,17 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-media_dir="$(readlink -f "$media_dir")"
-print_verbose "Using directory $media_dir"
-current_episode="$(readlink -f "$current_episode")"
-print_verbose "Using manually specified episode $current_episode"
-
 touch "$progress_file"
 
 if (( list )); then
   cat "$progress_file"
   exit 0
 fi
+
+media_dir="$(readlink -f "$media_dir")"
+print_verbose "Using directory $media_dir"
+current_episode="$(readlink -f "$current_episode")"
+print_verbose "Using manually specified episode $current_episode"
 
 if [[ ! -z $current_episode ]]; then
   if [[ $current_episode == $media_dir* ]]; then
@@ -203,7 +216,7 @@ else
   fi
 fi
 
-echo "${current_episode}"
+$command "${current_episode}"
 
 if (( advance )); then
   write_progress_file "$current_episode"
