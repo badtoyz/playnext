@@ -19,9 +19,9 @@ function print_usage() {
   echo "  mplayer \`$script_name\`"
   echo
   echo "Options:"
-  echo "  -d directory  print files from given directory; defaults to current directory"
+  echo "  -d directory  print files from given directory (default: current directory)"
   echo "  -e filename   output given episode and remember this"
-  echo "  -f filename   configuration file name; defaults to $progress_file"
+  echo "  -f filename   configuration file name (default: $progress_file)"
   echo "  -h            show this help"
   echo "  -l            print the list of last episodes played"
   echo "  -n            don't advance; next run will print same output"
