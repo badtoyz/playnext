@@ -10,7 +10,7 @@ verbose=0
 current_episode=
 
 function print_usage() {
-  echo "Usage:  $script_name [OPTION]..."
+  echo "Usage:  $script_name [OPTION]... [DIR]"
   echo
   echo "Outputs the file name of the next episode in the current directory, recursively."
   echo "Typically, you'd want to run this as:"
@@ -18,8 +18,9 @@ function print_usage() {
   echo "  cd /some/directory/with/media/files"
   echo "  mplayer \`$script_name\`"
   echo
+  echo "When DIR is given, use that directory instead of the current one."
+  echo
   echo "Options:"
-  echo "  -d, --dir=directory           print files from given directory (default: .)"
   echo "  -e, --episode=filename        output given episode and remember this"
   echo "  -f, --progress-file=filename  configuration file name (default: $progress_file)"
   echo "  -h, --help                    show this help"
@@ -160,6 +161,11 @@ while [[ $# -gt 0 ]]; do
       ;;
     -*)
       usage_error "Invalid option: $opt"
+      ;;
+    *)
+      (( set_media_dir )) && usage_error "Multiple directories given"
+      media_dir="$1"
+      set_media_dir=1
       ;;
   esac
   shift

@@ -41,7 +41,7 @@ function assert_output() {
 function assert_fail() {
   message="$1"
   shift
-  ! playnext "$@" 2>/dev/null || fail "$message"
+  ! playnext "$@" > /dev/null 2>&1 || fail "$message"
 }
 
 function reset_progress() {
@@ -75,8 +75,8 @@ assert_fail "Did not run out of files"
 
 # Test multiple episodes in progress
 reset_progress
-playnext -d "Dir 1" -e "Dir 1/File 1" > /dev/null
-playnext -d "Dir 3" -e "Dir 3/File 1" > /dev/null
+playnext "Dir 1" -e "Dir 1/File 1" > /dev/null
+playnext "Dir 3" -e "Dir 3/File 1" > /dev/null
 assert_fail "Did not warn about multiple episodes in progress"
 
 # Test progress recording for multiple media dirs
@@ -90,10 +90,11 @@ playnext > /dev/null
 popd > /dev/null
 assert_output "$(echo -e "$media_dir/Dir 1/File 1\n$media_dir_2/Dir 4/File 1")" -l
 
-# Test -d
+# Test directory argument
 reset_progress
 pushd /tmp > /dev/null
-assert_output "$media_dir/Dir 1/File 1" -d $media_dir
+assert_output "$media_dir/Dir 1/File 1" $media_dir
+assert_fail "Did not fail with multiple directories" $media_dir $media_dir_2
 popd > /dev/null
 
 # Test -e
