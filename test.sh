@@ -2,6 +2,7 @@
 
 playnext=$(dirname $(readlink -f $0))/playnext
 media_dir=$(mktemp -d)
+media_dir_2=$(mktemp -d)
 progress_file=$(mktemp)
 
 args="-f $progress_file"
@@ -40,7 +41,6 @@ function assert_output() {
 function assert_fail() {
   message="$1"
   shift
-  last_command="$@"
   ! playnext "$@" 2>/dev/null || fail "$message"
 }
 
@@ -78,6 +78,17 @@ reset_progress
 playnext -d "Dir 1" -e "Dir 1/File 1" > /dev/null
 playnext -d "Dir 3" -e "Dir 3/File 1" > /dev/null
 assert_fail "Did not warn about multiple episodes in progress"
+
+# Test progress recording for multiple media dirs
+reset_progress
+playnext > /dev/null
+pushd $media_dir_2 > /dev/null
+mkdir "Dir 4"
+touch "Dir 4/File 1"
+touch "File 2"
+playnext > /dev/null
+popd > /dev/null
+assert_output "$(echo -e "$media_dir/Dir 1/File 1\n$media_dir_2/Dir 4/File 1")" -l
 
 # Test -d
 reset_progress

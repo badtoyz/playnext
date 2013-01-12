@@ -60,12 +60,12 @@ function write_progress_file() {
   local progress_file_tmp="$(mktemp --tmpdir="$(dirname "$progress_file")" playnextrc.XXXXX)"
   print_verbose "Writing new progress file to $progress_file_tmp..."
   while read; do
-    if [[ $REPLY == $media_dir* ]]; then
+    if [[ $REPLY != $media_dir* ]]; then
       echo "$REPLY"
     fi
   done < "$progress_file" > "$progress_file_tmp"
   if [[ ! -z $current_episode ]]; then
-    echo "$current_episode" > "$progress_file_tmp"
+    echo "$current_episode" >> "$progress_file_tmp"
   fi
   print_verbose "Moving $progress_file_tmp into place..."
   mv "$progress_file_tmp" "$progress_file"
