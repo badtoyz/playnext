@@ -63,7 +63,7 @@ function read_progress_file() {
 function find_media_dir() {
   local matches=( )
   for episode in "${progress[@]}"; do
-    if [[ $episode == *$media_dir* ]]; then
+    if [[ $episode == *"$media_dir"* ]]; then
       matches+=( $episode )
     fi
   done
@@ -78,7 +78,7 @@ function find_media_dir() {
   fi
 
   local new_media_dir="${matches[0]}"
-  while [[ ${new_media_dir%/*} == *$media_dir* ]]; do
+  while [[ ${new_media_dir%/*} == *"$media_dir"* ]]; do
     new_media_dir="${new_media_dir%/*}"
   done
 
@@ -87,7 +87,7 @@ function find_media_dir() {
 
 function find_previous_episode() {
   for episode in "${progress[@]}"; do
-    if [[ $episode == $media_dir* ]]; then
+    if [[ $episode == "$media_dir"* ]]; then
       if [[ -z $previous_episode ]]; then
         previous_episode="$episode"
         print_verbose "Previous episode: $previous_episode"
@@ -103,7 +103,7 @@ function write_progress_file() {
   print_verbose "Writing new progress file to $progress_file..."
   (
     for episode in "${progress[@]}"; do
-      if [[ $episode != $media_dir* ]]; then
+      if [[ $episode != "$media_dir"* ]]; then
         echo "$episode"
       fi
     done 
@@ -243,7 +243,7 @@ cd "$media_dir"
 current_episode="$(readlink -f "$current_episode")"
 print_verbose "Canonical current episode is $current_episode"
 if [[ ! -z $current_episode ]]; then
-  if [[ $current_episode != $media_dir* ]]; then
+  if [[ $current_episode != "$media_dir"* ]]; then
     exit_error "The given file $current_episode does not reside in $media_dir"
   fi
   print_verbose "Using current episode $current_episode"
