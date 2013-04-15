@@ -63,7 +63,7 @@ function read_progress_file() {
 function find_media_dir() {
   local matches=( )
   for episode in "${progress[@]}"; do
-    if [[ $episode == *"$media_dir"* ]]; then
+    if [[ "$episode" == *"$media_dir"* ]]; then
       matches+=( $episode )
     fi
   done
@@ -78,7 +78,7 @@ function find_media_dir() {
   fi
 
   local new_media_dir="${matches[0]}"
-  while [[ ${new_media_dir%/*} == *"$media_dir"* ]]; do
+  while [[ "${new_media_dir%/*}" == *"$media_dir"* ]]; do
     new_media_dir="${new_media_dir%/*}"
   done
 
@@ -87,8 +87,8 @@ function find_media_dir() {
 
 function find_previous_episode() {
   for episode in "${progress[@]}"; do
-    if [[ $episode == "$media_dir"* ]]; then
-      if [[ -z $previous_episode ]]; then
+    if [[ "$episode" == "$media_dir"* ]]; then
+      if [[ -z "$previous_episode" ]]; then
         previous_episode="$episode"
         print_verbose "Previous episode: $previous_episode"
       else
@@ -103,11 +103,11 @@ function write_progress_file() {
   print_verbose "Writing new progress file to $progress_file..."
   (
     for episode in "${progress[@]}"; do
-      if [[ $episode != "$media_dir"* ]]; then
+      if [[ "$episode" != "$media_dir"* ]]; then
         echo "$episode"
       fi
     done 
-    if [[ ! -z $current_episode ]]; then
+    if [[ ! -z "$current_episode" ]]; then
       echo "$current_episode"
     fi
   ) > "$progress_file"
@@ -123,24 +123,25 @@ function find_next_episode() {
   fi
 
   local previous_index
-  if [[ -z $previous_episode ]]; then
+  if [[ -z "$previous_episode" ]]; then
     print_verbose "No previous episode found; starting from first"
     previous_index=-1
   else
     for (( i = 0; i < ${#episodes[@]}; i++ )); do
-      if [[ ${episodes[$i]} == $previous_episode ]]; then
+      if [[ "${episodes[$i]}" == "$previous_episode" ]]; then
+        print_verbose "Found episode ${previous_episode#$media_dir/} at index $i"
         previous_index=$i
         break
-        return
       fi
     done
   fi
 
-  if [[ -z previous_index ]]; then
+  if [[ -z "$previous_index" ]]; then
     exit_error "Previous episode ${previous_episode#$media_dir/} not found; use -e to specify episode"
   fi
 
   local current_index=$(( previous_index + offset ))
+  print_verbose "Next episode is at index $current_index"
   if (( current_index < 0 )); then
     exit_error "No more episodes before ${episodes[0]#$media_dir/}"
   fi
@@ -158,7 +159,7 @@ function usage_error() {
 }
 
 function require_argument() {
-  [[ -z ${2+x} ]] && print_usage && print_error "Option $1 requires an argument" && exit 1
+  [[ -z "${2+x}" ]] && print_usage && print_error "Option $1 requires an argument" && exit 1
 }
 
 while (( $# > 0 )); do
@@ -203,7 +204,7 @@ while (( $# > 0 )); do
       usage_error "Invalid option: $1"
       ;;
     *)
-      [[ ! -z $media_dir ]] && usage_error "Multiple directories given"
+      [[ ! -z "$media_dir" ]] && usage_error "Multiple directories given"
       media_dir="$1"
       ;;
   esac
@@ -224,11 +225,11 @@ if (( list )); then
   exit 0
 fi
 
-[[ -z $media_dir ]] && usage_error "No directory given"
+[[ -z "$media_dir" ]] && usage_error "No directory given"
 
-if [[ -d $media_dir ]]; then
+if [[ -d "$media_dir" ]]; then
   print_verbose "Media directory found"
-elif [[ -f $media_dir ]]; then
+elif [[ -f "$media_dir" ]]; then
   print_verbose "Media directory $media_dir is a file; treating as current episode"
   current_episode="$(readlink -f "$media_dir")"
   media_dir="$(dirname "$current_episode")"
@@ -242,8 +243,8 @@ cd "$media_dir"
 
 current_episode="$(readlink -f "$current_episode")"
 print_verbose "Canonical current episode is $current_episode"
-if [[ ! -z $current_episode ]]; then
-  if [[ $current_episode != "$media_dir"* ]]; then
+if [[ ! -z "$current_episode" ]]; then
+  if [[ "$current_episode" != "$media_dir"* ]]; then
     exit_error "The given file $current_episode does not reside in $media_dir"
   fi
   print_verbose "Using current episode $current_episode"
